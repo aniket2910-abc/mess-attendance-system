@@ -62,7 +62,7 @@ function QRScanner() {
         const email = data.session.user.email;
 
         const response = await fetch(
-          `http://127.0.0.1:8000/students?email=${encodeURIComponent(
+          `https://mess-attendance-backend.vercel.app/students?email=${encodeURIComponent(
             email
           )}`
         );
@@ -309,7 +309,7 @@ function QRScanner() {
       // =====================================================
 
       const response = await fetch(
-        "http://127.0.0.1:8000/attendance/scan",
+        "https://mess-attendance-backend.vercel.app/attendance/scan",
         {
           method: "POST",
 

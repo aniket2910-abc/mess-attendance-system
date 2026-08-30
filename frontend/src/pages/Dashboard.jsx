@@ -139,7 +139,7 @@ const [complaintSubmitting, setComplaintSubmitting] = useState(false);
         const email = data.session.user.email;
 
         const response = await fetch(
-          `http://127.0.0.1:8000/students?email=${encodeURIComponent(email)}`
+          `https://mess-attendance-backend.vercel.app/students?email=${encodeURIComponent(email)}`
         );
 
         const result = await response.json();

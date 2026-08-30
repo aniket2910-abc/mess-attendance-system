@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import "../styles/AdminDashboard.css";
 import * as XLSX from "xlsx";
+const API_URL = import.meta.env.VITE_API_URL;
 
 /* =====================================================
    CONSTANTS / HELPERS
@@ -2210,7 +2211,7 @@ function GeofencePage() {
       setLoading(true);
 
       const response = await fetch(
-        "http://127.0.0.1:8000/geofences"
+        `${API_URL}/geofences`
       );
 
       const result = await response.json();
@@ -2264,7 +2265,7 @@ function GeofencePage() {
       setSaving(true);
 
       const response = await fetch(
-        "http://127.0.0.1:8000/geofences",
+        `${API_URL}/geofences`
         {
           method: "PUT",
           headers: {
@@ -2331,7 +2332,7 @@ function GeofencePage() {
       setDeleting(fenceName);
 
       const response = await fetch(
-        `http://127.0.0.1:8000/geofences/${encodeURIComponent(
+        `https://mess-attendance-backend.vercel.app/geofences/${encodeURIComponent(
           fenceName
         )}`,
         {
@@ -3008,7 +3009,7 @@ function PasswordResetPage() {
 
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/admin/change-password",
+        "https://mess-attendance-backend.vercel.app/admin/change-password",
         {
           method: "POST",
           headers: {

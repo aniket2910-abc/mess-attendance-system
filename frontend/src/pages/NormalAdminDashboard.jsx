@@ -2231,7 +2231,7 @@ function ArchivesPage() {
   const loadArchives = async () => {
     setLoading(true); setError("");
     try {
-      const response = await fetch("http://127.0.0.1:8000/admin/monthly-archives");
+      const response = await fetch("https://mess-attendance-backend.vercel.app/admin/monthly-archives");
       const result = await response.json();
       if (!response.ok || result.status === "error") throw new Error(result.message || "Unable to load archives.");
       setArchives(result.data || result.archives || []);
@@ -2246,7 +2246,7 @@ function ArchivesPage() {
   const downloadArchive = async (archive) => {
     if (!archive?.id) return;
     try {
-      const response = await fetch(`http://127.0.0.1:8000/admin/monthly-archives/${archive.id}/download`);
+      const response = await fetch(`https://mess-attendance-backend.vercel.app/admin/monthly-archives/${archive.id}/download`);
       const result = await response.json();
       if (!response.ok || result.status === "error") throw new Error(result.message || "Unable to create download link.");
       const url = result.url || result.signed_url || result.download_url;
@@ -2319,7 +2319,7 @@ function PasswordResetPage() {
 
     try {
       const response = await fetch(
-        "http://127.0.0.1:8000/admin/change-password",
+        "https://mess-attendance-backend.vercel.app/admin/change-password",
         {
           method: "POST",
           headers: {

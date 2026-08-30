@@ -23,7 +23,7 @@ const handleKeySubmit = async (e) => {
   }
 
   try {
-    const response = await fetch("http://127.0.0.1:8000/admin/verify-setup-key", {
+    const response = await fetch("https://mess-attendance-backend.vercel.app/admin/verify-setup-key", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -81,7 +81,7 @@ const handleKeySubmit = async (e) => {
     setLoading(true);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/admin/register", {
+      const response = await fetch("https://mess-attendance-backend.vercel.app/admin/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
