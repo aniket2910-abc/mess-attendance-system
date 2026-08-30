@@ -1,3 +1,4 @@
+import traceback
 from fastapi.responses import Response
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -849,8 +850,15 @@ def scan_attendance(scan: AttendanceScan):
         }
 
     except Exception as e:
-        return {"status": "error", "message": f"Attendance failed: {str(e)}"}
+    print("========== ATTENDANCE ERROR ==========")
+    print("ERROR:", repr(e))
+    traceback.print_exc()
+    print("======================================")
 
+    return {
+        "status": "error",
+        "message": f"Attendance failed: {str(e)}"
+    }
 
 # =========================================================
 # GET STUDENT ATTENDANCE
