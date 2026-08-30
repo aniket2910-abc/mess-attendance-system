@@ -680,10 +680,17 @@ def delete_geofence(fence_name: str):
 # SCAN ATTENDANCE
 # =========================================================
 
+# =========================================================
+# SCAN ATTENDANCE
+# =========================================================
+
 @app.post("/attendance/scan")
 def scan_attendance(scan: AttendanceScan):
     if supabase is None:
-        return {"status": "error", "message": "Supabase client is not available"}
+        return {
+            "status": "error",
+            "message": "Supabase client is not available"
+        }
 
     try:
         # Resolve roll number safely.
@@ -696,6 +703,7 @@ def scan_attendance(scan: AttendanceScan):
 
         if incoming_roll_no:
             roll_no = str(incoming_roll_no).strip()
+
             if roll_no.isdigit():
                 roll_no = roll_no.zfill(10)
 
@@ -724,41 +732,75 @@ def scan_attendance(scan: AttendanceScan):
             }
 
         # =====================================================
-        # HOSTELLER CHECK -- THIS IS THE SECURITY GATE
-        # A student existing in students is NOT enough.
-        # The roll_no must exist in hostelers.
+        # HOSTELLER CHECK -- SECURITY GATE
         # =====================================================
-        hosteller_result = (supabase.table("hostelers").select("*")
-                            .eq("roll_no", roll_no).limit(1).execute())
+
+        hosteller_result = (
+            supabase
+            .table("hostelers")
+            .select("*")
+            .eq("roll_no", roll_no)
+            .limit(1)
+            .execute()
+        )
 
         if not hosteller_result.data:
             return {
                 "status": "error",
-                "message": "Attendance not allowed. You are not registered as a hosteller."
+                "message": (
+                    "Attendance not allowed. "
+                    "You are not registered as a hosteller."
+                )
             }
 
         hosteller = hosteller_result.data[0]
 
-        # Student table is used only for display/details.
-        student_result = (supabase.table("students").select("*")
-                           .eq("roll_no", roll_no).limit(1).execute())
-        student = student_result.data[0] if student_result.data else hosteller
+        # Student table is used for display/details.
+        student_result = (
+            supabase
+            .table("students")
+            .select("*")
+            .eq("roll_no", roll_no)
+            .limit(1)
+            .execute()
+        )
+
+        student = (
+            student_result.data[0]
+            if student_result.data
+            else hosteller
+        )
 
         # =====================================================
         # GEOFENCE
         # =====================================================
-        if scan.latitude is None or scan.longitude is None:
-            return {"status": "error", "message": "Location permission is required to mark attendance."}
 
-        location_allowed, location_message, location_name = check_geofence(
-            scan.latitude, scan.longitude
+        if scan.latitude is None or scan.longitude is None:
+            return {
+                "status": "error",
+                "message": (
+                    "Location permission is required "
+                    "to mark attendance."
+                )
+            }
+
+        location_allowed, location_message, location_name = (
+            check_geofence(
+                scan.latitude,
+                scan.longitude
+            )
         )
+
         if not location_allowed:
-            return {"status": "error", "message": location_message}
+            return {
+                "status": "error",
+                "message": location_message
+            }
 
         # =====================================================
         # TIME / MEAL
         # =====================================================
+
         now = datetime.now(INDIA_TZ)
         today = now.date().isoformat()
         current_time = now.strftime("%I:%M:%S %p")
@@ -767,26 +809,39 @@ def scan_attendance(scan: AttendanceScan):
         if meal is None:
             return {
                 "status": "error",
-                "message": "Attendance is currently closed. Mess attendance is available from 04:00 AM to 12:30 AM."
+                "message": (
+                    "Attendance is currently closed. "
+                    "Mess attendance is available from "
+                    "04:00 AM to 12:30 AM."
+                )
             }
 
         # =====================================================
-        # DUPLICATE CHECK BY ROLL NUMBER
+        # DUPLICATE CHECK
         # =====================================================
-        existing = (supabase.table("attendance")
-                    .select("id, scan_time, meal_type")
-                    .eq("roll_no", roll_no)
-                    .eq("attendance_date", today)
-                    .eq("meal_type", meal)
-                    .limit(1).execute())
+
+        existing = (
+            supabase
+            .table("attendance")
+            .select("id, scan_time, meal_type")
+            .eq("roll_no", roll_no)
+            .eq("attendance_date", today)
+            .eq("meal_type", meal)
+            .limit(1)
+            .execute()
+        )
 
         if existing.data:
             previous = existing.data[0]
+
             attendance_id = previous.get("id")
+
             token_number = (
                 f"GP-BARH-MESS-{int(attendance_id):07d}"
-                if attendance_id is not None else None
+                if attendance_id is not None
+                else None
             )
+
             return {
                 "status": "duplicate",
                 "message": f"{meal} attendance already marked.",
@@ -795,8 +850,14 @@ def scan_attendance(scan: AttendanceScan):
                     "student": student.get("name"),
                     "email": student.get("email"),
                     "roll_no": roll_no,
-                    "hostel": student.get("hostel") or hosteller.get("hostel"),
-                    "room_number": student.get("room_number") or hosteller.get("room_number"),
+                    "hostel": (
+                        student.get("hostel")
+                        or hosteller.get("hostel")
+                    ),
+                    "room_number": (
+                        student.get("room_number")
+                        or hosteller.get("room_number")
+                    ),
                     "date": today,
                     "meal": meal,
                     "scan_time": previous.get("scan_time"),
@@ -806,45 +867,75 @@ def scan_attendance(scan: AttendanceScan):
             }
 
         # =====================================================
-        # INSERT -- KEEP EXISTING TOKEN SYSTEM
+        # INSERT ATTENDANCE
         # =====================================================
+
         attendance_data = {
-            # IMPORTANT:
-            # The attendance table uses roll_no as the attendance identity.
-            # Do NOT insert student_id here because the current attendance
-            # table does not contain a student_id column.
             "student_name": student.get("name"),
             "roll_no": roll_no,
-            "hostel": student.get("hostel") or hosteller.get("hostel"),
-            "room_number": student.get("room_number") or hosteller.get("room_number"),
+            "hostel": (
+                student.get("hostel")
+                or hosteller.get("hostel")
+            ),
+            "room_number": (
+                student.get("room_number")
+                or hosteller.get("room_number")
+            ),
             "attendance_date": today,
             "meal_type": meal,
             "scan_time": now.isoformat(),
             "status": "Present"
         }
 
-        result = supabase.table("attendance").insert(attendance_data).execute()
-        inserted_row = result.data[0] if result.data else None
+        result = (
+            supabase
+            .table("attendance")
+            .insert(attendance_data)
+            .execute()
+        )
+
+        inserted_row = (
+            result.data[0]
+            if result.data
+            else None
+        )
 
         if not inserted_row:
-            return {"status": "error", "message": "Attendance could not be saved."}
+            return {
+                "status": "error",
+                "message": "Attendance could not be saved."
+            }
+
+        # =====================================================
+        # TOKEN NUMBER
+        # =====================================================
 
         attendance_id = inserted_row.get("id")
+
         token_number = (
             f"GP-BARH-MESS-{int(attendance_id):07d}"
-            if attendance_id is not None else None
+            if attendance_id is not None
+            else None
         )
 
         return {
             "status": "success",
-            "message": f"{meal} attendance marked successfully.",
+            "message": (
+                f"{meal} attendance marked successfully."
+            ),
             "token_number": token_number,
             "data": {
                 "student": student.get("name"),
                 "email": student.get("email"),
                 "roll_no": roll_no,
-                "hostel": student.get("hostel") or hosteller.get("hostel"),
-                "room_number": student.get("room_number") or hosteller.get("room_number"),
+                "hostel": (
+                    student.get("hostel")
+                    or hosteller.get("hostel")
+                ),
+                "room_number": (
+                    student.get("room_number")
+                    or hosteller.get("room_number")
+                ),
                 "date": today,
                 "time": current_time,
                 "meal": meal,
@@ -854,84 +945,14 @@ def scan_attendance(scan: AttendanceScan):
         }
 
     except Exception as e:
-    print("========== ATTENDANCE ERROR ==========")
-    print("ERROR:", repr(e))
-    traceback.print_exc()
-    print("======================================")
-
-    return {
-        "status": "error",
-        "message": f"Attendance failed: {str(e)}"
-    }
-
-# =========================================================
-# GET STUDENT ATTENDANCE
-# =========================================================
-
-@app.get(
-    "/attendance/student/{student_id}"
-)
-def get_student_attendance(
-    student_id: int
-):
-
-    if supabase is None:
+        print("========= ATTENDANCE ERROR =========")
+        print("ERROR:", repr(e))
+        traceback.print_exc()
+        print("====================================")
 
         return {
             "status": "error",
-            "message": "Supabase client is not available"
-        }
-
-    try:
-
-        end_date = datetime.now(INDIA_TZ).date()
-        start_date = end_date - timedelta(days=29)
-
-        result = (
-            supabase
-            .table("attendance")
-            .select("*")
-            .eq(
-                "student_id",
-                student_id
-            )
-            .gte(
-                "attendance_date",
-                start_date.isoformat()
-            )
-            .lte(
-                "attendance_date",
-                end_date.isoformat()
-            )
-            .order(
-                "attendance_date",
-                desc=True
-            )
-            .order(
-                "scan_time",
-                desc=True
-            )
-            .execute()
-        )
-
-        return {
-
-            "status":
-                "success",
-
-            "data":
-                result.data
-        }
-
-    except Exception as e:
-
-        return {
-
-            "status":
-                "error",
-
-            "message":
-                str(e)
+            "message": f"Attendance failed: {str(e)}"
         }
 
 
