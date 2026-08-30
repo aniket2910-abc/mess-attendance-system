@@ -2265,8 +2265,8 @@ function GeofencePage() {
       setSaving(true);
 
       const response = await fetch(
-        `${API_URL}/geofences`
-        {
+  `${API_URL}/geofences`,
+  {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
