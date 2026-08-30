@@ -1,0 +1,297 @@
+/* =========================================================
+   GP BARH — LOGIN
+   Same registry/ledger language as the admin panel:
+   navy "seal" mark, brass accents, serif heading,
+   mono for the fine print.
+========================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
+
+.login-page {
+  --ink-navy: #12213D;
+  --ink-navy-soft: #1B2E4E;
+  --brass: #B08D57;
+  --brass-light: #D8BD8C;
+  --paper: #F3F5F7;
+  --card: #FFFFFF;
+  --line: #E3E7EC;
+  --text: #1B2430;
+  --text-muted: #66707E;
+  --red: #A62B23;
+  --red-bg: #FBEAE8;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(216, 189, 140, 0.10), transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(216, 189, 140, 0.08), transparent 45%),
+    var(--ink-navy);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.login-page * {
+  box-sizing: border-box;
+}
+
+.login-page :focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+/* =========================================================
+   CARD
+========================================================= */
+
+.login-container {
+  width: 100%;
+  max-width: 400px;
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  padding: 38px 34px 30px;
+  box-shadow: 0 24px 60px rgba(8, 15, 30, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* =========================================================
+   HEADER
+========================================================= */
+
+.login-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+/* Signature mark: same stamped ring as the admin sidebar seal */
+.login-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--brass);
+  background: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  position: relative;
+}
+
+.login-icon::before {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(176, 141, 87, 0.3);
+  border-radius: 50%;
+}
+
+.login-header h1 {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--ink-navy);
+  letter-spacing: -0.01em;
+  margin: 0 0 6px;
+}
+
+.login-header p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* =========================================================
+   FORM
+========================================================= */
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.input-group label {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.input-group input {
+  padding: 11px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  font-size: 14px;
+  color: var(--text);
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.input-group input::placeholder {
+  color: #A6AEB9;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: var(--brass);
+  background: var(--card);
+  box-shadow: 0 0 0 3px rgba(176, 141, 87, 0.14);
+}
+
+.login-button {
+  margin-top: 6px;
+  padding: 12px 16px;
+  background: var(--ink-navy);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.login-button:hover:not(:disabled) {
+  background: var(--ink-navy-soft);
+}
+
+.login-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.login-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* =========================================================
+   FOOTER
+========================================================= */
+
+.login-footer {
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.register-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.register-section span {
+  color: var(--text-muted);
+}
+
+.register-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--brass);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.register-link:hover {
+  text-decoration: underline;
+}
+
+/* ---- admin section ---- */
+
+.admin-divider {
+  position: relative;
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.admin-divider::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: var(--line);
+}
+
+.admin-divider span {
+  position: relative;
+  background: var(--card);
+  padding: 0 12px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.admin-login-section {
+  text-align: center;
+}
+
+.admin-login-section p {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.admin-login-link {
+  width: 100%;
+  padding: 11px 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink-navy);
+  font-size: 13.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.admin-login-link:hover {
+  border-color: var(--brass);
+  background: #F7EEDE;
+}
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 460px) {
+  .login-container {
+    padding: 30px 22px 26px;
+  }
+
+  .login-header h1 {
+    font-size: 21px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-page * {
+    transition: none !important;
+  }
+}
