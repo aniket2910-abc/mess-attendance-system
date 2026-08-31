@@ -1,3 +1,4 @@
+from fastapi.responses import Response
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -95,6 +96,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.options("/{path:path}")
+async def cors_preflight(path: str):
+    return Response(status_code=204)
 
 # =========================================================
 # INDIA TIMEZONE
