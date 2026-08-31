@@ -286,6 +286,18 @@ function QRScanner() {
       const latitude = Number(position.coords.latitude);
       const longitude = Number(position.coords.longitude);
 
+      const accuracy = Number(position.coords.accuracy);
+
+console.log("========== GPS DEBUG ==========");
+console.log("Latitude :", latitude);
+console.log("Longitude:", longitude);
+console.log("Accuracy :", accuracy, "meters");
+console.log("================================");
+
+setMessage(
+  `GPS: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} | Accuracy: ${Math.round(accuracy)}m`
+);
+
       if (
         !Number.isFinite(latitude) ||
         !Number.isFinite(longitude)
