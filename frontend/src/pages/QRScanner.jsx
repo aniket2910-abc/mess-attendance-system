@@ -254,34 +254,18 @@ function QRScanner() {
       setMessage("Getting your current location...");
 
       const position = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          resolve,
-
-          (geoError) => {
-            let text =
-              "Location permission is required to mark attendance.";
-
-            if (geoError?.code === 1) {
-              text =
-                "Location permission was denied. Allow Location for localhost and try again.";
-            } else if (geoError?.code === 2) {
-              text =
-                "Your location could not be detected. Turn on Windows/browser location and try again.";
-            } else if (geoError?.code === 3) {
-              text =
-                "Location request timed out. Turn on Location and try again.";
-            }
-
-            reject(new Error(text));
-          },
-
-          {
-  enableHighAccuracy: false,
-  timeout: 30000,
-  maximumAge: 10000,
-}
-        );
-      });
+  navigator.geolocation.getCurrentPosition(
+    resolve,
+    (geoError) => {
+      reject(geoError);
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 30000,
+      maximumAge: 0,
+    }
+  );
+});
 
       const latitude = Number(position.coords.latitude);
       const longitude = Number(position.coords.longitude);
