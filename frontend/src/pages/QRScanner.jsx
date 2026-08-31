@@ -260,7 +260,7 @@ function QRScanner() {
       reject(geoError);
     },
     {
-      enableHighAccuracy: true,
+      enableHighAccuracy: false,
       timeout: 30000,
       maximumAge: 0,
     }
