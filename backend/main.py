@@ -46,6 +46,54 @@ def get_supabase_client() -> Client:
     )
 
 # =========================================================
+# SUPABASE REST HELPER
+# =========================================================
+# Attendance uses the REST API directly instead of the Supabase
+# Python/PostgREST sync client. This avoids the Vercel serverless
+# httpx socket error: [Errno 16] Device or resource busy.
+def supabase_rest_request(method: str, table: str, params=None, json_data=None):
+    import requests
+
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        raise RuntimeError("Supabase environment variables are missing.")
+
+    url = f"{SUPABASE_URL.rstrip('/')}/rest/v1/{table}"
+    headers = {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    if method.upper() == "POST":
+        headers["Prefer"] = "return=representation"
+
+    response = requests.request(
+        method=method.upper(),
+        url=url,
+        headers=headers,
+        params=params or {},
+        json=json_data,
+        timeout=15,
+    )
+
+    if not response.ok:
+        try:
+            detail = response.json()
+        except Exception:
+            detail = response.text
+        raise RuntimeError(
+            f"Supabase REST error {response.status_code}: {detail}"
+        )
+
+    if not response.text:
+        return []
+
+    try:
+        return response.json()
+    except Exception:
+        return []
+
+# =========================================================
 # SUPABASE CLIENT
 # =========================================================
 
@@ -700,40 +748,34 @@ def delete_geofence(fence_name: str):
 @app.post("/attendance/scan")
 def scan_attendance(scan: AttendanceScan):
     try:
-        # IMPORTANT:
-        # Create a fresh Supabase client for every attendance request.
-        # This avoids reusing a long-lived sync HTTP connection in Vercel.
-        db = get_supabase_client()
+        # Attendance uses direct Supabase REST calls here.
+        # This avoids the Vercel/httpx [Errno 16] resource-busy error.
 
-        # Resolve roll number safely.
-        # Some older frontend requests send only student_id.
-        # Some newer requests may send roll_no.
-        # Eligibility is ALWAYS decided by hostelers.roll_no.
+        # -----------------------------------------------------
+        # RESOLVE ROLL NUMBER
+        # -----------------------------------------------------
         roll_no = None
 
         incoming_roll_no = getattr(scan, "roll_no", None)
 
         if incoming_roll_no:
             roll_no = str(incoming_roll_no).strip()
-
             if roll_no.isdigit():
                 roll_no = roll_no.zfill(10)
 
         elif scan.student_id is not None:
-            legacy = (
-                db
-                .table("students")
-                .select("roll_no")
-                .eq("id", scan.student_id)
-                .limit(1)
-                .execute()
+            legacy = supabase_rest_request(
+                "GET",
+                "students",
+                params={
+                    "select": "roll_no",
+                    "id": f"eq.{scan.student_id}",
+                    "limit": "1",
+                },
             )
 
-            if legacy.data and legacy.data[0].get("roll_no") is not None:
-                roll_no = str(
-                    legacy.data[0]["roll_no"]
-                ).strip()
-
+            if legacy and legacy[0].get("roll_no") is not None:
+                roll_no = str(legacy[0]["roll_no"]).strip()
                 if roll_no.isdigit():
                     roll_no = roll_no.zfill(10)
 
@@ -746,16 +788,17 @@ def scan_attendance(scan: AttendanceScan):
         # =====================================================
         # HOSTELLER CHECK -- SECURITY GATE
         # =====================================================
-        hosteller_result = (
-            db
-            .table("hostelers")
-            .select("*")
-            .eq("roll_no", roll_no)
-            .limit(1)
-            .execute()
+        hosteller_rows = supabase_rest_request(
+            "GET",
+            "hostelers",
+            params={
+                "select": "*",
+                "roll_no": f"eq.{roll_no}",
+                "limit": "1",
+            },
         )
 
-        if not hosteller_result.data:
+        if not hosteller_rows:
             return {
                 "status": "error",
                 "message": (
@@ -764,26 +807,25 @@ def scan_attendance(scan: AttendanceScan):
                 )
             }
 
-        hosteller = hosteller_result.data[0]
+        hosteller = hosteller_rows[0]
 
-        # Student table is used for display/details.
-        student_result = (
-            db
-            .table("students")
-            .select("*")
-            .eq("roll_no", roll_no)
-            .limit(1)
-            .execute()
+        # -----------------------------------------------------
+        # STUDENT DETAILS
+        # -----------------------------------------------------
+        student_rows = supabase_rest_request(
+            "GET",
+            "students",
+            params={
+                "select": "*",
+                "roll_no": f"eq.{roll_no}",
+                "limit": "1",
+            },
         )
 
-        student = (
-            student_result.data[0]
-            if student_result.data
-            else hosteller
-        )
+        student = student_rows[0] if student_rows else hosteller
 
         # =====================================================
-        # GEOFENCE
+        # LOCATION / GEOFENCE
         # =====================================================
         if scan.latitude is None or scan.longitude is None:
             return {
@@ -794,13 +836,37 @@ def scan_attendance(scan: AttendanceScan):
                 )
             }
 
-        location_allowed, location_message, location_name = (
-            check_geofence(
-                scan.latitude,
-                scan.longitude,
-                db
-            )
+        fences = supabase_rest_request(
+            "GET",
+            "geofences",
+            params={
+                "select": "name,latitude,longitude,radius_meters",
+            },
         )
+
+        if not fences:
+            return {
+                "status": "error",
+                "message": "No geofence locations are configured."
+            }
+
+        location_allowed = False
+        location_message = "You are outside the allowed mess/hostel location."
+
+        for fence in fences:
+            distance = calculate_distance_meters(
+                float(scan.latitude),
+                float(scan.longitude),
+                float(fence["latitude"]),
+                float(fence["longitude"]),
+            )
+
+            if distance <= float(fence["radius_meters"]):
+                location_allowed = True
+                location_message = (
+                    f"Location verified at {fence['name']}."
+                )
+                break
 
         if not location_allowed:
             return {
@@ -829,22 +895,21 @@ def scan_attendance(scan: AttendanceScan):
         # =====================================================
         # DUPLICATE CHECK
         # =====================================================
-        existing = (
-            db
-            .table("attendance")
-            .select("id, scan_time, meal_type")
-            .eq("roll_no", roll_no)
-            .eq("attendance_date", today)
-            .eq("meal_type", meal)
-            .limit(1)
-            .execute()
+        existing = supabase_rest_request(
+            "GET",
+            "attendance",
+            params={
+                "select": "id,scan_time,meal_type",
+                "roll_no": f"eq.{roll_no}",
+                "attendance_date": f"eq.{today}",
+                "meal_type": f"eq.{meal}",
+                "limit": "1",
+            },
         )
 
-        if existing.data:
-            previous = existing.data[0]
-
+        if existing:
+            previous = existing[0]
             attendance_id = previous.get("id")
-
             token_number = (
                 f"GP-BARH-MESS-{int(attendance_id):07d}"
                 if attendance_id is not None
@@ -871,8 +936,8 @@ def scan_attendance(scan: AttendanceScan):
                     "meal": meal,
                     "scan_time": previous.get("scan_time"),
                     "status": "Present",
-                    "token_number": token_number
-                }
+                    "token_number": token_number,
+                },
             }
 
         # =====================================================
@@ -892,21 +957,16 @@ def scan_attendance(scan: AttendanceScan):
             "attendance_date": today,
             "meal_type": meal,
             "scan_time": now.isoformat(),
-            "status": "Present"
+            "status": "Present",
         }
 
-        result = (
-            db
-            .table("attendance")
-            .insert(attendance_data)
-            .execute()
+        inserted = supabase_rest_request(
+            "POST",
+            "attendance",
+            json_data=attendance_data,
         )
 
-        inserted_row = (
-            result.data[0]
-            if result.data
-            else None
-        )
+        inserted_row = inserted[0] if inserted else None
 
         if not inserted_row:
             return {
@@ -914,11 +974,7 @@ def scan_attendance(scan: AttendanceScan):
                 "message": "Attendance could not be saved."
             }
 
-        # =====================================================
-        # TOKEN NUMBER
-        # =====================================================
         attendance_id = inserted_row.get("id")
-
         token_number = (
             f"GP-BARH-MESS-{int(attendance_id):07d}"
             if attendance_id is not None
@@ -927,9 +983,7 @@ def scan_attendance(scan: AttendanceScan):
 
         return {
             "status": "success",
-            "message": (
-                f"{meal} attendance marked successfully."
-            ),
+            "message": f"{meal} attendance marked successfully.",
             "token_number": token_number,
             "data": {
                 "student": student.get("name"),
@@ -947,8 +1001,8 @@ def scan_attendance(scan: AttendanceScan):
                 "time": current_time,
                 "meal": meal,
                 "status": "Present",
-                "token_number": token_number
-            }
+                "token_number": token_number,
+            },
         }
 
     except Exception as e:
