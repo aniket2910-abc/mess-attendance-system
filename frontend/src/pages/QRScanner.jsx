@@ -587,10 +587,10 @@ Accuracy: ${Math.round(accuracy)}m`
                 Scan Mess QR
               </h2>
 
-              <p>
+              <h3>
                 Scan the permanent QR displayed at the mess <br />
                  • Please give location and camera permission to mark attendance
-              </p>
+              </h3>
 
             </div>
 
