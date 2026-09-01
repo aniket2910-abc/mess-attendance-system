@@ -1638,7 +1638,7 @@ function HostellersPage() {
 
       if (!rows.length) throw new Error("The Excel file is empty.");
 
-      const normalise = (value) => String(value ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+      const normalise = (value) => String(value ?? "").trim().toLowerCase().replace(/[\s._-]+/g, "_").replace(/^_+|_+$/g, "");
       const getValue = (row, aliases) => {
         const keys = Object.keys(row);
         for (const alias of aliases) {
