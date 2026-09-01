@@ -268,9 +268,9 @@ function QRScanner() {
 });
 
       const latitude = Number(position.coords.latitude);
-      const longitude = Number(position.coords.longitude);
+const longitude = Number(position.coords.longitude);
 
-      const accuracy = Number(position.coords.accuracy);
+const accuracy = Number(position.coords.accuracy);
 
 console.log("========== GPS DEBUG ==========");
 console.log("Latitude :", latitude);
@@ -279,7 +279,10 @@ console.log("Accuracy :", accuracy, "meters");
 console.log("================================");
 
 setMessage(
-  `GPS: ${latitude.toFixed(6)}, ${longitude.toFixed(6)} | Accuracy: ${Math.round(accuracy)}m`
+  `GPS Location:
+Lat: ${latitude.toFixed(6)}
+Lng: ${longitude.toFixed(6)}
+Accuracy: ${Math.round(accuracy)}m`
 );
 
       if (
