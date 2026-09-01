@@ -988,7 +988,7 @@ Accuracy: ${Math.round(accuracy)}m`
               </span>
 
               <p>
-                Allow camera permission
+                Allow camera permission <br /> And also location permission
               </p>
 
             </div>
