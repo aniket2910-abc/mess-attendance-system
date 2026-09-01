@@ -1654,8 +1654,7 @@ function HostellersPage() {
         const email = getValue(row, ["email", "email_id", "mail"]);
         const roll_no = getValue(row, ["roll_no", "roll_number", "roll", "rollno"]).replace(/\s/g, "");
         const hostel = getValue(row, ["hostel", "hostel_name"]);
-        const room_number = getValue(row, ["room_number", "room_no", "room", "roomno"]);
-
+const room_number = getValue(row, ["room_number", "room_no", "room_no.", "room", "roomno"]);
         if (!name || !email || !roll_no || !hostel || !room_number) {
           throw new Error(`Row ${index + 2} is missing required data. Required columns: name, email, roll_no, hostel, room_number.`);
         }
