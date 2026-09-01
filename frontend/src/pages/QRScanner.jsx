@@ -257,13 +257,27 @@ function QRScanner() {
   navigator.geolocation.getCurrentPosition(
     resolve,
     (geoError) => {
-      reject(geoError);
+      console.log("First GPS attempt failed:", geoError);
+
+      // Second attempt with more time and cached location allowed
+      navigator.geolocation.getCurrentPosition(
+        resolve,
+        (secondError) => {
+          console.log("Second GPS attempt failed:", secondError);
+          reject(secondError);
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 60000,
+          maximumAge: 30000,
+        }
+      );
     },
     {
       enableHighAccuracy: false,
-      timeout: 30000,
-      maximumAge: 0,
-    }
+      timeout: 15000,
+      maximumAge: 30000,
+        }
   );
 });
 
