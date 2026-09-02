@@ -378,22 +378,11 @@ Accuracy: ${Math.round(accuracy)}m`
       // =====================================================
 
       if (result.status === "duplicate") {
-        const duplicateToken =
-          result?.data?.token_number ||
-          result?.token_number ||
-          "";
-
-        setSuccess(true);
-
-        setTokenNumber(duplicateToken);
-
-        setMessage(
-          result.message ||
-            "This meal attendance is already marked."
-        );
-
-        return;
-      }
+  setSuccess(false);
+  setTokenNumber("");
+  setMessage("Your attendance was already recorded.");
+  return;
+}
 
       // =====================================================
       // SUCCESS
