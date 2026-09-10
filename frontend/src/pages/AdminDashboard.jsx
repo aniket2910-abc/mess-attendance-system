@@ -1963,46 +1963,86 @@ function MenuPage() {
   const [weekData, setWeekData] = useState(emptyWeek());
 
   const loadMenus = async () => {
-    setLoading(true);
+  setLoading(true);
 
+  try {
     const weekEnd = addDays(weekStart, 6);
 
+    /*
+     * Load all menu records up to the selected week.
+     * For every day, we will use the latest saved menu
+     * on or before that particular date.
+     *
+     * This makes the weekly menu persistent:
+     * Monday's menu keeps repeating every Monday
+     * until Monday is updated again.
+     */
     const { data, error } = await supabase
       .from("mess_menu")
       .select("*")
-      .gte("menu_date", weekStart)
       .lte("menu_date", weekEnd)
-      .order("menu_date", { ascending: true });
+      .order("menu_date", { ascending: false });
 
     if (error) {
-      console.error("Menu load error:", error);
-      setWeekData(emptyWeek());
-      setLoading(false);
-      return;
+      throw error;
     }
 
     const newWeek = emptyWeek();
 
-    (data || []).forEach((item) => {
-      const day =
-        item.day ||
-        getDayName(item.menu_date);
+    DAYS.forEach((day, dayIndex) => {
+      const targetDate = addDays(weekStart, dayIndex);
 
-      if (
-        newWeek[day] &&
-        Object.prototype.hasOwnProperty.call(
-          newWeek[day],
-          item.meal_type
-        )
-      ) {
-        newWeek[day][item.meal_type] =
-          item.menu_items || "";
+      /*
+       * Only consider records for this weekday
+       * that were saved on or before its target date.
+       */
+      const dayRecords = (data || []).filter((item) => {
+        const itemDay =
+          item.day ||
+          getDayName(item.menu_date);
+
+        return (
+          itemDay === day &&
+          item.menu_date <= targetDate
+        );
+      });
+
+      if (!dayRecords.length) {
+        return;
       }
+
+      /*
+       * Because data is ordered newest → oldest,
+       * the first date found is the latest version
+       * of this day's menu.
+       */
+      const latestDate = dayRecords[0].menu_date;
+
+      const latestDayRecords = dayRecords.filter(
+        (item) => item.menu_date === latestDate
+      );
+
+      latestDayRecords.forEach((item) => {
+        if (
+          Object.prototype.hasOwnProperty.call(
+            newWeek[day],
+            item.meal_type
+          )
+        ) {
+          newWeek[day][item.meal_type] =
+            item.menu_items || "";
+        }
+      });
     });
 
     setWeekData(newWeek);
+  } catch (error) {
+    console.error("Menu load error:", error);
+    setWeekData(emptyWeek());
+  } finally {
     setLoading(false);
-  };
+  }
+};
 
   useEffect(() => {
     loadMenus();

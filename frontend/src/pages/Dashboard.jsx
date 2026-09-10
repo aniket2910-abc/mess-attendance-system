@@ -176,41 +176,77 @@ const [complaintSubmitting, setComplaintSubmitting] = useState(false);
   /* ================= MENU ================= */
 
   const loadMenu = async () => {
-    setMenuLoading(true);
+  setMenuLoading(true);
 
-    try {
-      const today = getTodayIndia();
+  try {
+    const today = getTodayIndia();
 
-      const { data, error } = await supabase
-        .from("mess_menu")
-        .select("*")
-        .eq("menu_date", today);
+    const { data, error } = await supabase
+      .from("mess_menu")
+      .select("*")
+      .lte("menu_date", today)
+      .order("menu_date", { ascending: false });
 
-      if (error) {
-        console.error("Menu error:", error);
-        setMenu([]);
-      } else {
-        const sorted = [...(data || [])].sort((a, b) => {
-          return (
-            MEALS.indexOf(
-              String(a.meal_type || "").toLowerCase().replace(/^./, (x) => x.toUpperCase())
-            ) -
-            MEALS.indexOf(
-              String(b.meal_type || "").toLowerCase().replace(/^./, (x) => x.toUpperCase())
-            )
-          );
-        });
-
-        setMenu(sorted);
-      }
-    } catch (error) {
-      console.error("Menu loading error:", error);
+    if (error) {
+      console.error("Menu error:", error);
       setMenu([]);
-    } finally {
-      setMenuLoading(false);
+      return;
     }
-  };
 
+    // Today's weekday
+    const todayDay = new Intl.DateTimeFormat("en-IN", {
+      weekday: "long",
+      timeZone: "Asia/Kolkata",
+    }).format(new Date());
+
+    // Find menus belonging to today's weekday
+    const dayMenus = (data || []).filter((item) => {
+      const itemDay =
+        item.day ||
+        getDayName(item.menu_date);
+
+      return itemDay === todayDay;
+    });
+
+    // No saved menu for this weekday
+    if (!dayMenus.length) {
+      setMenu([]);
+      return;
+    }
+
+    // Because data is newest -> oldest,
+    // first matching record gives latest saved date.
+    const latestDate = dayMenus[0].menu_date;
+
+    // Get only the latest version of today's menu
+    const latestRows = dayMenus.filter(
+      (item) => item.menu_date === latestDate
+    );
+
+    // Keep meal order: Breakfast -> Lunch -> Snacks -> Dinner
+    const sorted = [...latestRows].sort((a, b) => {
+      return (
+        MEALS.indexOf(
+          String(a.meal_type || "")
+            .toLowerCase()
+            .replace(/^./, (x) => x.toUpperCase())
+        ) -
+        MEALS.indexOf(
+          String(b.meal_type || "")
+            .toLowerCase()
+            .replace(/^./, (x) => x.toUpperCase())
+        )
+      );
+    });
+
+    setMenu(sorted);
+  } catch (error) {
+    console.error("Menu loading error:", error);
+    setMenu([]);
+  } finally {
+    setMenuLoading(false);
+  }
+};
   /* ================= NOTICES ================= */
 
   const loadNotices = async () => {
