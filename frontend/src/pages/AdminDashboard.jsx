@@ -301,10 +301,11 @@ function DashboardHome() {
           .select("*", { count: "exact", head: true }),
 
         supabase
-          .from("attendance")
-          .select("*", { count: "exact", head: true })
-          .eq("attendance_date", today),
-
+        
+  
+  .from("attendance")
+  .select("meal_type, status, roll_no, student_name")
+  .eq("attendance_date", today),
         supabase
           .from("mess_menu")
           .select("*", { count: "exact", head: true })
@@ -320,49 +321,106 @@ function DashboardHome() {
           .select("*", { count: "exact", head: true }),
       ]);
 
-      setStats({
-        students: studentsResult.count || 0,
-        attendance: attendanceResult.count || 0,
-        menu: menuResult.count || 0,
-        notices: noticesResult.count || 0,
-        complaints: complaintsResult.count || 0,
-      });
+      const presentByMeal = {};
 
-      const { data: attendanceRows, error: attendanceError } =
-        await supabase
-          .from("attendance")
-          .select("attendance_date")
-          .gte("attendance_date", startDate)
-          .lte("attendance_date", today);
+(attendanceResult.data || []).forEach((row) => {
+  if (row.status !== "Present") return;
 
-      if (attendanceError) {
-        console.error(
-          "Weekly attendance error:",
-          attendanceError
-        );
-        setWeeklyAttendance([]);
-      } else {
-        const weekly = DAYS.map((_, index) => {
-          const date = addDays(startDate, index);
+  const meal = String(row.meal_type || "").trim().toLowerCase();
 
-          const count = (attendanceRows || []).filter(
-            (row) => row.attendance_date === date
-          ).length;
+  if (!meal) return;
 
-          const dateObj = new Date(`${date}T12:00:00`);
+  if (!presentByMeal[meal]) {
+    presentByMeal[meal] = new Set();
+  }
 
-          return {
-            date,
-            count,
-            label: dateObj.toLocaleDateString("en-IN", {
-              weekday: "short",
-            }),
-          };
-        });
+  const studentKey =
+  row.student_name ??
+  row.roll_no;
+  if (studentKey !== undefined && studentKey !== null) {
+    presentByMeal[meal].add(String(studentKey));
+  }
+});
 
+const mealCounts = Object.values(presentByMeal).map(
+  (students) => students.size
+);
+
+const highestMealAttendance =
+  mealCounts.length > 0 ? Math.max(...mealCounts) : 0;
+
+setStats({
+  students: studentsResult.count || 0,
+  attendance: highestMealAttendance,
+  menu: menuResult.count || 0,
+  notices: noticesResult.count || 0,
+  complaints: complaintsResult.count || 0,
+});
+
+    const dailyAttendanceRows = await Promise.all(
+  DAYS.map((_, index) => {
+    const date = addDays(startDate, index);
+
+    return supabase
+      .from("attendance")
+      .select("meal_type, status, student_name, roll_no")
+      .eq("attendance_date", date)
+      .eq("status", "Present");
+  })
+);
+const weekly = DAYS.map((_, index) => {
+  const date = addDays(startDate, index);
+
+  const result = dailyAttendanceRows[index];
+  const dayRows = result?.data || [];
+
+  const mealStudents = {};
+
+  dayRows.forEach((row) => {
+    const meal = String(row.meal_type || "")
+      .trim()
+      .toLowerCase();
+
+    if (!meal) return;
+
+    if (!mealStudents[meal]) {
+      mealStudents[meal] = new Set();
+    }
+
+    const studentKey =
+      row.student_name ??
+      row.roll_no;
+
+    if (studentKey !== undefined && studentKey !== null) {
+      mealStudents[meal].add(String(studentKey));
+    }
+  });
+
+  const mealCounts = Object.values(mealStudents).map(
+    (students) => students.size
+  );
+
+  const count = mealCounts.reduce(
+    (total, mealCount) => total + mealCount,
+    0
+  );
+
+  const dateObj = new Date(`${date}T12:00:00`);
+
+  return {
+    date,
+    count,
+    label: dateObj.toLocaleDateString("en-IN", {
+      weekday: "short",
+    }),
+  };
+});
+
+setWeeklyAttendance(weekly);
+     
         setWeeklyAttendance(weekly);
       }
-    } catch (error) {
+     catch (error) {
       console.error("Dashboard error:", error);
     } finally {
       setLoading(false);
