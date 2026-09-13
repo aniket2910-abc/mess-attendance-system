@@ -417,10 +417,7 @@ const weekly = DAYS.map((_, index) => {
 });
 
 setWeeklyAttendance(weekly);
-     
-        setWeeklyAttendance(weekly);
-      }
-     catch (error) {
+    } catch (error) {
       console.error("Dashboard error:", error);
     } finally {
       setLoading(false);
@@ -630,6 +627,27 @@ function AttendancePage() {
   const [selectedMeal, setSelectedMeal] = useState("");
   const [selectedHostel, setSelectedHostel] = useState("");
   const [studentSearch, setStudentSearch] = useState("");
+const pdfColumns = [
+  { key: "attendance_date", label: "Date", default: true },
+  { key: "student_name", label: "Student Name", default: true },
+  { key: "roll_no", label: "Roll No.", default: true },
+  { key: "hostel", label: "Hostel", default: true },
+  { key: "room_number", label: "Room", default: true },
+  { key: "meal_type", label: "Meal", default: true },
+  { key: "created_at", label: "Created At", default: false },
+  { key: "scan_time", label: "Scan Time", default: false },
+  { key: "status", label: "Status", default: false },
+  { key: "id", label: "ID", default: false },
+];
+
+const [selectedPdfColumns, setSelectedPdfColumns] = useState(
+  pdfColumns
+    .filter((column) => column.default)
+    .map((column) => column.key)
+);
+
+const [showPdfColumnSelector, setShowPdfColumnSelector] =
+  useState(false);
 
   const loadAttendance = async () => {
     setLoading(true);
@@ -864,25 +882,63 @@ function AttendancePage() {
       return;
     }
 
-    const tableRows = data
-      .map(
-        (row) => `
-          <tr>
-            <td>${escapeExcel(formatDate(row.attendance_date))}</td>
-            <td>${escapeExcel(row.student_name || "—")}</td>
-            <td>${escapeExcel(row.roll_no || "—")}</td>
-            <td>${escapeExcel(row.hostel || "—")}</td>
-            <td>${escapeExcel(row.room_number || "—")}</td>
-            <td>${escapeExcel(row.meal_type || "—")}</td>
-            <td>${escapeExcel(formatDateTimeForExport(row.created_at))}</td>
-            <td>${escapeExcel(formatDateTimeForExport(row.scan_time))}</td>
-            <td>${escapeExcel(row.status || "—")}</td>
-            <td>${escapeExcel(row.id ?? "—")}</td>
-          </tr>
-        `
-      )
-      .join("");
+    const selectedColumns = pdfColumns.filter((column) =>
+  selectedPdfColumns.includes(column.key)
+);
 
+const getPdfValue = (row, key) => {
+  switch (key) {
+    case "attendance_date":
+      return formatDate(row.attendance_date);
+
+    case "created_at":
+      return formatDateTimeForExport(row.created_at);
+
+    case "scan_time":
+      return formatDateTimeForExport(row.scan_time);
+
+    case "student_name":
+      return row.student_name || "—";
+
+    case "roll_no":
+      return row.roll_no || "—";
+
+    case "hostel":
+      return row.hostel || "—";
+
+    case "room_number":
+      return row.room_number || "—";
+
+    case "meal_type":
+      return row.meal_type || "—";
+
+    case "status":
+      return row.status || "—";
+
+    case "id":
+      return row.id ?? "—";
+
+    default:
+      return "—";
+  }
+};
+
+const tableRows = data
+  .map(
+    (row) => `
+      <tr>
+        ${selectedColumns
+          .map(
+            (column) =>
+              `<td>${escapeExcel(
+                getPdfValue(row, column.key)
+              )}</td>`
+          )
+          .join("")}
+      </tr>
+    `
+  )
+  .join("");
     popup.document.write(`
       <!doctype html>
       <html>
@@ -917,19 +973,12 @@ function AttendancePage() {
 
           <table>
             <thead>
-              <tr>
-                <th>Date</th>
-                <th>Student Name</th>
-                <th>Roll No.</th>
-                <th>Hostel</th>
-                <th>Room</th>
-                <th>Meal</th>
-                <th>Created At</th>
-                <th>Scan Time</th>
-                <th>Status</th>
-                <th>ID</th>
-              </tr>
-            </thead>
+  <tr>
+    ${selectedColumns
+      .map((column) => `<th>${column.label}</th>`)
+      .join("")}
+  </tr>
+</thead>
             <tbody>${tableRows}</tbody>
           </table>
 
@@ -948,6 +997,95 @@ function AttendancePage() {
 
   return (
     <div className="content-card">
+
+      {showPdfColumnSelector && (
+  <div
+    style={{
+      marginBottom: "20px",
+      padding: "18px",
+      border: "1px solid #e5e7eb",
+      borderRadius: "14px",
+      background: "#f8fafc",
+    }}
+  >
+    <h3 style={{ marginTop: 0 }}>
+      Select PDF Columns
+    </h3>
+
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns:
+          "repeat(auto-fit, minmax(180px, 1fr))",
+        gap: "10px",
+        marginBottom: "16px",
+      }}
+    >
+      {pdfColumns.map((column) => (
+        <label
+          key={column.key}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={selectedPdfColumns.includes(column.key)}
+            onChange={(e) => {
+              setSelectedPdfColumns((current) => {
+                if (e.target.checked) {
+                  return [...current, column.key];
+                }
+
+                return current.filter(
+                  (key) => key !== column.key
+                );
+              });
+            }}
+          />
+          <span>{column.label}</span>
+        </label>
+      ))}
+    </div>
+
+    <div
+      style={{
+        display: "flex",
+        gap: "10px",
+        flexWrap: "wrap",
+      }}
+    >
+      <button
+        type="button"
+        className="primary-button"
+        onClick={() => {
+          if (selectedPdfColumns.length === 0) {
+            alert("Please select at least one column.");
+            return;
+          }
+
+          setShowPdfColumnSelector(false);
+          exportPDF();
+        }}
+      >
+        📄 Generate PDF
+      </button>
+
+      <button
+        type="button"
+        className="secondary-button"
+        onClick={() =>
+          setShowPdfColumnSelector(false)
+        }
+      >
+        Cancel
+      </button>
+    </div>
+  </div>
+)}
 
       {/* ================= HEADER ================= */}
       <div className="card-header">
@@ -978,9 +1116,9 @@ function AttendancePage() {
           <button
             type="button"
             className="secondary-button export-button"
-            onClick={exportPDF}
+            onClick={() => setShowPdfColumnSelector(true)}
             disabled={loading || data.length === 0}
-            title="Export currently filtered data to PDF"
+            title="Choose columns and export filtered data to PDF"
           >
             📄 PDF
           </button>
