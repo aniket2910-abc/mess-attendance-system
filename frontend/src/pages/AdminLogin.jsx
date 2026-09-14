@@ -78,7 +78,7 @@ function AdminLogin() {
         throw new Error("You are not authorized as an admin.");
       }
 
-      // 3. Save admin information
+      // 3. Save admin informatio n
       localStorage.setItem("adminLoggedIn", "true");
       localStorage.setItem("adminEmail", adminData.email);
       localStorage.setItem("adminRole", adminData.role);

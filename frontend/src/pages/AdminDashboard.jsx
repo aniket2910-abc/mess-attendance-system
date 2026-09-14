@@ -14,11 +14,11 @@ const menuItems = [
   { id: "students", icon: "🎓", label: "Students" },
   { id: "hostellers", icon: "🏫", label: "Hostellers" },
   { id: "menu", icon: "🍽️", label: "Mess Menu" },
+  { id: "timings", icon: "⏰", label: "Mess Timing" },
   { id: "notices", icon: "📢", label: "Notices" },
   
   { id: "complaints", icon: "📝", label: "Complaints & Feedback" },
   { id: "password", icon: "🔐", label: "Password Reset" },
-  { id: "geofences", icon: "📍", label: "Geofences" },
 ];
 
 const MEALS = ["Breakfast", "Lunch", "Snacks", "Dinner"];
@@ -167,11 +167,11 @@ export default function AdminDashboard() {
 
       case "hostellers":
         return <HostellersPage />;
-      case "geofences":
-  return <GeofencePage />;
-      
         case "menu":
         return <MenuPage />;
+
+      case "timings":
+        return <MealTimingsPage />;
 
       case "notices":
         return <NoticesPage />;
@@ -184,9 +184,6 @@ export default function AdminDashboard() {
 
       case "password":
         return <PasswordResetPage />;
-
-        case "geofence":
-    return <GeofencePage />;
 
       default:
         return <DashboardHome />;
@@ -1765,6 +1762,24 @@ function HostellersPage() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
+  const [showHostellerExportSelector, setShowHostellerExportSelector] =
+    useState(false);
+
+  const hostellerColumns = [
+    { key: "id", label: "ID", default: true },
+    { key: "name", label: "NAME", default: true },
+    { key: "email", label: "EMAIL", default: true },
+    { key: "roll_no", label: "ROLL NO", default: true },
+    { key: "hostel", label: "HOSTEL", default: true },
+    { key: "room_number", label: "ROOM NUMBER", default: true },
+  ];
+
+  const [selectedHostellerColumns, setSelectedHostellerColumns] = useState(
+    hostellerColumns
+      .filter((column) => column.default)
+      .map((column) => column.key)
+  );
+
   const emptyForm = {
     name: "",
     email: "",
@@ -1789,6 +1804,7 @@ function HostellersPage() {
     } else {
       setData(rows || []);
     }
+
     setLoading(false);
   };
 
@@ -1820,7 +1836,11 @@ function HostellersPage() {
     if (!file) return;
 
     const fileName = file.name.toLowerCase();
-    if (!fileName.endsWith(".xlsx") && !fileName.endsWith(".xls") && !fileName.endsWith(".csv")) {
+    if (
+      !fileName.endsWith(".xlsx") &&
+      !fileName.endsWith(".xls") &&
+      !fileName.endsWith(".csv")
+    ) {
       alert("Please select an Excel (.xlsx/.xls) or CSV file.");
       return;
     }
@@ -1830,17 +1850,33 @@ function HostellersPage() {
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: "", raw: false });
+      const rows = XLSX.utils.sheet_to_json(firstSheet, {
+        defval: "",
+        raw: false,
+      });
 
       if (!rows.length) throw new Error("The Excel file is empty.");
 
-      const normalise = (value) => String(value ?? "").trim().toLowerCase().replace(/[\s._-]+/g, "_").replace(/^_+|_+$/g, "");
+      const normalise = (value) =>
+        String(value ?? "")
+          .trim()
+          .toLowerCase()
+          .replace(/[\s._-]+/g, "_")
+          .replace(/^_+|_+$/g, "");
+
       const getValue = (row, aliases) => {
         const keys = Object.keys(row);
         for (const alias of aliases) {
           const wanted = normalise(alias);
-          const key = keys.find((currentKey) => normalise(currentKey) === wanted);
-          if (key !== undefined && String(row[key]).trim() !== "") return String(row[key]).trim();
+          const key = keys.find(
+            (currentKey) => normalise(currentKey) === wanted
+          );
+          if (
+            key !== undefined &&
+            String(row[key]).trim() !== ""
+          ) {
+            return String(row[key]).trim();
+          }
         }
         return "";
       };
@@ -1848,48 +1884,95 @@ function HostellersPage() {
       const imported = rows.map((row, index) => {
         const name = getValue(row, ["name", "full_name", "student_name"]);
         const email = getValue(row, ["email", "email_id", "mail"]);
-        const roll_no = getValue(row, ["roll_no", "roll_number", "roll", "rollno"]).replace(/\s/g, "");
+        const roll_no = getValue(row, [
+          "roll_no",
+          "roll_number",
+          "roll",
+          "rollno",
+        ]).replace(/\s/g, "");
         const hostel = getValue(row, ["hostel", "hostel_name"]);
-const room_number = getValue(row, ["room_number", "room_no", "room_no.", "room", "roomno"]);
+        const room_number = getValue(row, [
+          "room_number",
+          "room_no",
+          "room_no.",
+          "room",
+          "roomno",
+        ]);
+
         if (!name || !email || !roll_no || !hostel || !room_number) {
-          throw new Error(`Row ${index + 2} is missing required data. Required columns: name, email, roll_no, hostel, room_number.`);
+          throw new Error(
+            `Row ${index + 2} is missing required data. Required columns: name, email, roll_no, hostel, room_number.`
+          );
         }
+
         if (!/^\d{10}$/.test(roll_no)) {
-          throw new Error(`Row ${index + 2}: Roll Number "${roll_no}" must be exactly 10 digits.`);
+          throw new Error(
+            `Row ${index + 2}: Roll Number "${roll_no}" must be exactly 10 digits.`
+          );
         }
-        return { name, email: email.toLowerCase(), roll_no, hostel, room_number };
+
+        return {
+          name,
+          email: email.toLowerCase(),
+          roll_no,
+          hostel,
+          room_number,
+        };
       });
 
       const uniqueByRoll = new Map();
       for (const student of imported) {
         if (uniqueByRoll.has(student.roll_no)) {
-          throw new Error(`Duplicate Roll Number ${student.roll_no} found in the Excel file.`);
+          throw new Error(
+            `Duplicate Roll Number ${student.roll_no} found in the Excel file.`
+          );
         }
         uniqueByRoll.set(student.roll_no, student);
       }
 
       const cleanRows = Array.from(uniqueByRoll.values());
       const rollNumbers = cleanRows.map((student) => student.roll_no);
+
       const { data: existingRows, error: existingError } = await supabase
         .from("hostelers")
         .select("roll_no")
         .in("roll_no", rollNumbers);
+
       if (existingError) throw existingError;
 
-      const existingRolls = new Set((existingRows || []).map((row) => String(row.roll_no)));
-      const rowsToInsert = cleanRows.filter((student) => !existingRolls.has(student.roll_no));
+      const existingRolls = new Set(
+        (existingRows || []).map((row) => String(row.roll_no))
+      );
 
-      if (!rowsToInsert.length) throw new Error("All students in this file are already verified hostellers.");
+      const rowsToInsert = cleanRows.filter(
+        (student) => !existingRolls.has(student.roll_no)
+      );
 
-      const { error: insertError } = await supabase.from("hostelers").insert(rowsToInsert);
+      if (!rowsToInsert.length) {
+        throw new Error(
+          "All students in this file are already verified hostellers."
+        );
+      }
+
+      const { error: insertError } = await supabase
+        .from("hostelers")
+        .insert(rowsToInsert);
+
       if (insertError) throw insertError;
 
       const skipped = cleanRows.length - rowsToInsert.length;
-      alert(`Excel import successful! ✅\n\nAdded: ${rowsToInsert.length}\nAlready verified/skipped: ${skipped}`);
+
+      alert(
+        `Excel import successful! ✅\n\nAdded: ${rowsToInsert.length}\nAlready verified/skipped: ${skipped}`
+      );
+
       await loadHostellers();
     } catch (error) {
       console.error("Excel import error:", error);
-      alert(error.message || "Excel import failed. Please check the file format.");
+      alert(
+        error.message ||
+          "Excel import failed. Please check the file format."
+      );
     } finally {
       setImporting(false);
     }
@@ -1910,6 +1993,7 @@ const room_number = getValue(row, ["room_number", "room_no", "room_no.", "room",
 
   const handleSaveHosteller = async (e) => {
     e.preventDefault();
+
     const name = formData.name.trim();
     const email = formData.email.trim().toLowerCase();
     const roll_no = formData.roll_no.trim();
@@ -1920,6 +2004,7 @@ const room_number = getValue(row, ["room_number", "room_no", "room_no.", "room",
       alert("Please fill all hosteller details.");
       return;
     }
+
     if (!/^\d{10}$/.test(roll_no)) {
       alert("Roll Number must be exactly 10 digits.");
       return;
@@ -1927,23 +2012,53 @@ const room_number = getValue(row, ["room_number", "room_no", "room_no.", "room",
 
     setSaving(true);
     try {
-      const duplicateQuery = supabase.from("hostelers").select("id, roll_no").eq("roll_no", roll_no);
-      const { data: existing, error: existingError } = editingId
-        ? await duplicateQuery.neq("id", editingId).maybeSingle()
-        : await duplicateQuery.maybeSingle();
-      if (existingError) throw existingError;
-      if (existing) throw new Error("This Roll Number is already verified as another hosteller.");
+      const duplicateQuery = supabase
+        .from("hostelers")
+        .select("id, roll_no")
+        .eq("roll_no", roll_no);
 
-      const payload = { name, email, roll_no, hostel, room_number };
-      let error;
-      if (editingId) {
-        ({ error } = await supabase.from("hostelers").update(payload).eq("id", editingId));
-      } else {
-        ({ error } = await supabase.from("hostelers").insert(payload));
+      const { data: existing, error: existingError } = editingId
+        ? await duplicateQuery
+            .neq("id", editingId)
+            .maybeSingle()
+        : await duplicateQuery.maybeSingle();
+
+      if (existingError) throw existingError;
+      if (existing) {
+        throw new Error(
+          "This Roll Number is already verified as another hosteller."
+        );
       }
+
+      const payload = {
+        name,
+        email,
+        roll_no,
+        hostel,
+        room_number,
+      };
+
+      let error;
+
+      if (editingId) {
+        ({ error } = await supabase
+          .from("hostelers")
+          .update(payload)
+          .eq("id", editingId));
+      } else {
+        ({ error } = await supabase
+          .from("hostelers")
+          .insert(payload));
+      }
+
       if (error) throw error;
 
-      alert(editingId ? "Hosteller updated successfully! ✅" : "Hosteller verified successfully! ✅");
+      alert(
+        editingId
+          ? "Hosteller updated successfully! ✅"
+          : "Hosteller verified successfully! ✅"
+      );
+
       resetForm();
       await loadHostellers();
     } catch (error) {
@@ -1958,13 +2073,20 @@ const room_number = getValue(row, ["room_number", "room_no", "room_no.", "room",
     const confirmed = window.confirm(
       `Delete ${student.name} (${student.roll_no}) from verified hostellers?\n\nThis removes them from the hostelers table. Existing attendance records are not deleted.`
     );
+
     if (!confirmed) return;
 
     setSaving(true);
     try {
-      const { error } = await supabase.from("hostelers").delete().eq("id", student.id);
+      const { error } = await supabase
+        .from("hostelers")
+        .delete()
+        .eq("id", student.id);
+
       if (error) throw error;
+
       if (editingId === student.id) resetForm();
+
       alert("Hosteller deleted successfully. 🗑️");
       await loadHostellers();
     } catch (error) {
@@ -1978,6 +2100,7 @@ const room_number = getValue(row, ["room_number", "room_no", "room_no.", "room",
   const filteredData = data.filter((student) => {
     const q = search.trim().toLowerCase();
     if (!q) return true;
+
     return (
       String(student.name || "").toLowerCase().includes(q) ||
       String(student.email || "").toLowerCase().includes(q) ||
@@ -1987,13 +2110,232 @@ const room_number = getValue(row, ["room_number", "room_no", "room_no.", "room",
     );
   });
 
+  const exportHostellersExcel = () => {
+    if (!filteredData.length) {
+      alert("No hosteller data to export.");
+      return;
+    }
+
+    if (!selectedHostellerColumns.length) {
+      alert("Please select at least one column.");
+      return;
+    }
+
+    const selectedColumns = hostellerColumns.filter((column) =>
+      selectedHostellerColumns.includes(column.key)
+    );
+
+    const rows = filteredData.map((student) =>
+      selectedColumns.map((column) => student[column.key] ?? "")
+    );
+
+    const worksheet = XLSX.utils.aoa_to_sheet([
+      selectedColumns.map((column) => column.label),
+      ...rows,
+    ]);
+
+    worksheet["!cols"] = selectedColumns.map((column) => ({
+      wch: column.key === "email" ? 32 : 18,
+    }));
+
+    const workbook = XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+      workbook,
+      worksheet,
+      "Hostellers"
+    );
+
+    XLSX.writeFile(
+      workbook,
+      `GP_Barh_Hostellers_${todayIndia()}.xlsx`
+    );
+  };
+
+  const escapeHtml = (value) =>
+    String(value ?? "—")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+
+  const exportHostellersPDF = () => {
+    if (!filteredData.length) {
+      alert("No hosteller data to export.");
+      return;
+    }
+
+    if (!selectedHostellerColumns.length) {
+      alert("Please select at least one column.");
+      return;
+    }
+
+    const popup = window.open(
+      "",
+      "_blank",
+      "width=1200,height=800"
+    );
+
+    if (!popup) {
+      alert("Please allow pop-ups to export the PDF.");
+      return;
+    }
+
+    const selectedColumns = hostellerColumns.filter((column) =>
+      selectedHostellerColumns.includes(column.key)
+    );
+
+    const rows = filteredData
+      .map(
+        (student) => `
+          <tr>
+            ${selectedColumns
+              .map(
+                (column) =>
+                  `<td>${escapeHtml(student[column.key])}</td>`
+              )
+              .join("")}
+          </tr>
+        `
+      )
+      .join("");
+
+    const headers = selectedColumns
+      .map((column) => `<th>${escapeHtml(column.label)}</th>`)
+      .join("");
+
+    popup.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <title>GP Barh — Hostellers Report</title>
+          <style>
+            @page {
+              size: A4 landscape;
+              margin: 12mm;
+            }
+
+            * {
+              box-sizing: border-box;
+            }
+
+            body {
+              font-family: Arial, sans-serif;
+              color: #111827;
+              margin: 0;
+            }
+
+            .header {
+              margin-bottom: 20px;
+            }
+
+            h1 {
+              margin: 0 0 5px;
+              font-size: 24px;
+            }
+
+            .subtitle {
+              color: #64748b;
+              font-size: 12px;
+            }
+
+            .meta {
+              margin-top: 8px;
+              font-size: 12px;
+              color: #475569;
+            }
+
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 18px;
+              font-size: 10px;
+            }
+
+            th {
+              background: #172554;
+              color: white;
+              padding: 8px;
+              border: 1px solid #172554;
+              text-align: left;
+            }
+
+            td {
+              padding: 7px;
+              border: 1px solid #cbd5e1;
+              vertical-align: top;
+            }
+
+            tr:nth-child(even) td {
+              background: #f8fafc;
+            }
+
+            .footer {
+              margin-top: 15px;
+              text-align: right;
+              color: #64748b;
+              font-size: 9px;
+            }
+          </style>
+        </head>
+
+        <body>
+          <div class="header">
+            <h1>GP Barh — Verified Hostellers</h1>
+            <div class="subtitle">
+              Government Polytechnic Barh
+            </div>
+            <div class="meta">
+              Total Hostellers: ${filteredData.length}
+              ${
+                search.trim()
+                  ? ` · Search: ${escapeHtml(search.trim())}`
+                  : ""
+              }
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                ${headers}
+              </tr>
+            </thead>
+
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            Generated: ${escapeHtml(
+              new Date().toLocaleString("en-IN", {
+                timeZone: "Asia/Kolkata",
+              })
+            )}
+          </div>
+        </body>
+      </html>
+    `);
+
+    popup.document.close();
+    popup.focus();
+
+    setTimeout(() => {
+      popup.print();
+    }, 300);
+  };
+
   return (
     <div className="content-card">
       <div className="card-header">
         <div>
           <span className="section-label">VERIFICATION</span>
           <h2>Verified Hostellers</h2>
-          <p>Only students added here are considered official hostel residents.</p>
+          <p>
+            Only students added here are considered official hostel residents.
+          </p>
         </div>
 
         <div className="header-actions">
@@ -2005,16 +2347,23 @@ const room_number = getValue(row, ["room_number", "room_no", "room_no.", "room",
             onChange={(e) => setSearch(e.target.value)}
           />
 
-          <button type="button" className="primary-button" onClick={() => {
-            if (showAddForm) resetForm();
-            else setShowAddForm(true);
-          }}>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={() => {
+              if (showAddForm) resetForm();
+              else setShowAddForm(true);
+            }}
+          >
             {showAddForm ? "✕ Close" : "+ Add Hosteller"}
           </button>
 
           <label
             className="primary-button"
-            style={{ cursor: importing ? "not-allowed" : "pointer", opacity: importing ? 0.6 : 1 }}
+            style={{
+              cursor: importing ? "not-allowed" : "pointer",
+              opacity: importing ? 0.6 : 1,
+            }}
           >
             {importing ? "Importing..." : "📊 Import Excel"}
             <input
@@ -2026,63 +2375,272 @@ const room_number = getValue(row, ["room_number", "room_no", "room_no.", "room",
             />
           </label>
 
-          <button type="button" className="primary-button" onClick={loadHostellers} disabled={saving || importing}>
+          <button
+            type="button"
+            className="secondary-button export-button"
+            onClick={() => setShowHostellerExportSelector(true)}
+            disabled={loading || importing || filteredData.length === 0}
+            title="Choose columns and export hostellers"
+          >
+            📤 Export
+          </button>
+
+          <button
+            type="button"
+            className="primary-button"
+            onClick={loadHostellers}
+            disabled={saving || importing}
+          >
             ↻ Refresh
           </button>
         </div>
       </div>
 
+      {showHostellerExportSelector && (
+        <div
+          style={{
+            marginBottom: "24px",
+            padding: "18px",
+            border: "1px solid #e5e7eb",
+            borderRadius: "14px",
+            background: "#f8fafc",
+          }}
+        >
+          <h3 style={{ marginTop: 0 }}>
+            Select Hosteller Export Columns
+          </h3>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: "10px",
+              marginBottom: "16px",
+            }}
+          >
+            {hostellerColumns.map((column) => (
+              <label
+                key={column.key}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedHostellerColumns.includes(column.key)}
+                  onChange={(e) => {
+                    setSelectedHostellerColumns((current) => {
+                      if (e.target.checked) {
+                        return [...current, column.key];
+                      }
+
+                      return current.filter(
+                        (key) => key !== column.key
+                      );
+                    });
+                  }}
+                />
+                <span>{column.label}</span>
+              </label>
+            ))}
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              flexWrap: "wrap",
+            }}
+          >
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => {
+                if (!selectedHostellerColumns.length) {
+                  alert("Please select at least one column.");
+                  return;
+                }
+
+                exportHostellersExcel();
+                setShowHostellerExportSelector(false);
+              }}
+            >
+              📊 Export Excel
+            </button>
+
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => {
+                if (!selectedHostellerColumns.length) {
+                  alert("Please select at least one column.");
+                  return;
+                }
+
+                exportHostellersPDF();
+                setShowHostellerExportSelector(false);
+              }}
+            >
+              📄 Export PDF
+            </button>
+
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setShowHostellerExportSelector(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {showAddForm && (
-        <div style={{ marginBottom: "24px", padding: "22px", border: "1px solid #e5e7eb", borderRadius: "14px" }}>
-          <h3>{editingId ? "Edit Verified Hosteller" : "Add Verified Hosteller"}</h3>
-          <p>{editingId ? "Update the verified hosteller details." : "Is section me sirf admin official hostel students add karega."}</p>
+        <div
+          style={{
+            marginBottom: "24px",
+            padding: "22px",
+            border: "1px solid #e5e7eb",
+            borderRadius: "14px",
+          }}
+        >
+          <h3>
+            {editingId
+              ? "Edit Verified Hosteller"
+              : "Add Verified Hosteller"}
+          </h3>
+
+          <p>
+            {editingId
+              ? "Update the verified hosteller details."
+              : "Is section me sirf admin official hostel students add karega."}
+          </p>
 
           <form onSubmit={handleSaveHosteller}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: "16px",
+              }}
+            >
               <div className="input-group">
                 <label>Full Name</label>
-                <input type="text" name="name" placeholder="Enter full name" value={formData.name} onChange={handleChange} required />
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Enter full name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                />
               </div>
+
               <div className="input-group">
                 <label>Email</label>
-                <input type="email" name="email" placeholder="Enter email" value={formData.email} onChange={handleChange} required />
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="Enter email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                />
               </div>
+
               <div className="input-group">
                 <label>10 Digit Roll Number</label>
-                <input type="text" name="roll_no" inputMode="numeric" maxLength={10} pattern="[0-9]{10}" placeholder="Enter 10 digit roll number" value={formData.roll_no} onChange={handleRollChange} required />
+                <input
+                  type="text"
+                  name="roll_no"
+                  inputMode="numeric"
+                  maxLength={10}
+                  pattern="[0-9]{10}"
+                  placeholder="Enter 10 digit roll number"
+                  value={formData.roll_no}
+                  onChange={handleRollChange}
+                  required
+                />
               </div>
+
               <div className="input-group">
                 <label>Hostel</label>
-                <select name="hostel" value={formData.hostel} onChange={handleChange} required>
+                <select
+                  name="hostel"
+                  value={formData.hostel}
+                  onChange={handleChange}
+                  required
+                >
                   <option value="">Select Hostel</option>
                   <option value="Boys Hostel 1">Boys Hostel 1</option>
                   <option value="Boys Hostel 2">Boys Hostel 2</option>
                   <option value="Girls Hostel">Girls Hostel</option>
                 </select>
               </div>
+
               <div className="input-group">
                 <label>Room Number</label>
-                <input type="text" name="room_number" placeholder="Enter room number" value={formData.room_number} onChange={handleChange} required />
+                <input
+                  type="text"
+                  name="room_number"
+                  placeholder="Enter room number"
+                  value={formData.room_number}
+                  onChange={handleChange}
+                  required
+                />
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-              <button type="submit" className="primary-button" disabled={saving || importing}>
-                {saving ? "Saving..." : editingId ? "✓ Save Changes" : "✓ Verify & Add Hosteller"}
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                marginTop: "20px",
+              }}
+            >
+              <button
+                type="submit"
+                className="primary-button"
+                disabled={saving || importing}
+              >
+                {saving
+                  ? "Saving..."
+                  : editingId
+                  ? "✓ Save Changes"
+                  : "✓ Verify & Add Hosteller"}
               </button>
-              <button type="button" className="secondary-button" onClick={resetForm} disabled={saving}>Cancel</button>
+
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={resetForm}
+                disabled={saving}
+              >
+                Cancel
+              </button>
             </div>
           </form>
         </div>
       )}
 
       {loading ? (
-        <div className="loading-state">Loading verified hostellers...</div>
+        <div className="loading-state">
+          Loading verified hostellers...
+        </div>
       ) : filteredData.length === 0 ? (
         <div className="empty-state">
           <div className="empty-icon">🏫</div>
           <h3>No verified hostellers found</h3>
-          <p>{search ? "No verified hosteller matches your search." : "Add official hostel students from this section."}</p>
+          <p>
+            {search
+              ? "No verified hosteller matches your search."
+              : "Add official hostel students from this section."}
+          </p>
         </div>
       ) : (
         <div className="table-wrapper">
@@ -2098,6 +2656,7 @@ const room_number = getValue(row, ["room_number", "room_no", "room_no.", "room",
                 <th>ACTION</th>
               </tr>
             </thead>
+
             <tbody>
               {filteredData.map((student) => (
                 <tr key={student.id}>
@@ -2108,7 +2667,13 @@ const room_number = getValue(row, ["room_number", "room_no", "room_no.", "room",
                   <td>{student.hostel}</td>
                   <td>{student.room_number}</td>
                   <td>
-                    <div style={{ display: "flex", gap: "8px", whiteSpace: "nowrap" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "8px",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       <button
                         type="button"
                         className="secondary-button"
@@ -2118,6 +2683,7 @@ const room_number = getValue(row, ["room_number", "room_no", "room_no.", "room",
                       >
                         ✏️ Edit
                       </button>
+
                       <button
                         type="button"
                         className="secondary-button"
@@ -2420,458 +2986,205 @@ function MenuPage() {
 }
 
 /* =====================================================
-   NOTICES
+   MEAL TIMING MANAGEMENT
 ===================================================== */
 
+function MealTimingsPage() {
+  const [timings, setTimings] = useState({
+    breakfast_start: "04:00",
+    breakfast_end: "12:00",
+    lunch_start: "12:00",
+    lunch_end: "17:00",
+    snacks_start: "17:00",
+    snacks_end: "19:00",
+    dinner_start: "19:00",
+    dinner_end: "00:00",
+  });
 
-/* =========================================================
-   GEOFENCE MANAGEMENT
-========================================================= */
-
-function GeofencePage() {
-  const [geofences, setGeofences] = useState([]);
   const [loading, setLoading] = useState(true);
-
-  const [name, setName] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
-  const [radius, setRadius] = useState("100");
-
-  const [editingName, setEditingName] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(null);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
-  const loadGeofences = async () => {
+  const loadTimings = async () => {
+    setLoading(true);
+    setMessage("");
+    setError("");
+
     try {
-      setLoading(true);
-
-      const response = await fetch(
-        `${API_URL}/geofences`
-      );
-
+      const response = await fetch(`${API_URL}/meal-timings`);
       const result = await response.json();
 
       if (!response.ok || result.status !== "success") {
-        throw new Error(
-          result.message || "Failed to load geofences."
-        );
+        throw new Error(result.message || "Could not load meal timings.");
       }
 
-      setGeofences(result.data || []);
+      const next = {};
 
-    } catch (error) {
-      console.error("Geofence load error:", error);
-      alert(error.message || "Failed to load geofences.");
+      (result.data || []).forEach((row) => {
+        const meal = String(row.meal_type || "").toLowerCase();
+        const start = String(row.start_time || "").slice(0, 5);
+        const end = String(row.end_time || "").slice(0, 5);
+
+        if (!start || !end) return;
+
+        if (meal === "breakfast") {
+          next.breakfast_start = start;
+          next.breakfast_end = end;
+        } else if (meal === "lunch") {
+          next.lunch_start = start;
+          next.lunch_end = end;
+        } else if (meal === "snacks") {
+          next.snacks_start = start;
+          next.snacks_end = end;
+        } else if (meal === "dinner") {
+          next.dinner_start = start;
+          next.dinner_end = end;
+        }
+      });
+
+      setTimings((previous) => ({ ...previous, ...next }));
+    } catch (err) {
+      console.error("Meal timing load error:", err);
+      setError(err.message || "Could not load meal timings.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadGeofences();
+    loadTimings();
   }, []);
 
-  const clearForm = () => {
-    setName("");
-    setLatitude("");
-    setLongitude("");
-    setRadius("100");
-    setEditingName(null);
+  const update = (key, value) => {
+    setTimings((previous) => ({ ...previous, [key]: value }));
   };
 
-  const saveGeofence = async () => {
-
-    if (!name.trim()) {
-      alert("Enter geofence name.");
-      return;
-    }
-
-    if (!latitude || !longitude) {
-      alert("Enter latitude and longitude.");
-      return;
-    }
-
-    if (!radius || Number(radius) <= 0) {
-      alert("Radius must be greater than 0.");
-      return;
-    }
+  const saveTimings = async () => {
+    setSaving(true);
+    setMessage("");
+    setError("");
 
     try {
-      setSaving(true);
-
-      const response = await fetch(
-  `${API_URL}/geofences`,
-  {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: name.trim(),
-            latitude: Number(latitude),
-            longitude: Number(longitude),
-            radius_meters: Number(radius),
-          }),
-        }
-      );
+      const response = await fetch(`${API_URL}/meal-timings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(timings),
+      });
 
       const result = await response.json();
 
       if (!response.ok || result.status !== "success") {
-        throw new Error(
-          result.message || "Failed to save geofence."
-        );
+        throw new Error(result.message || "Could not update meal timings.");
       }
 
-      alert(
-        editingName
-          ? "Geofence updated successfully."
-          : "Geofence added successfully."
-      );
+      setTimings((previous) => {
+        const next = { ...previous };
+        (result.data || []).forEach((row) => {
+          const meal = String(row.meal_type || "").toLowerCase();
+          const start = String(row.start_time || "").slice(0, 5);
+          const end = String(row.end_time || "").slice(0, 5);
+          if (meal === "breakfast") { next.breakfast_start = start; next.breakfast_end = end; }
+          if (meal === "lunch") { next.lunch_start = start; next.lunch_end = end; }
+          if (meal === "snacks") { next.snacks_start = start; next.snacks_end = end; }
+          if (meal === "dinner") { next.dinner_start = start; next.dinner_end = end; }
+        });
+        return next;
+      });
 
-      clearForm();
-      await loadGeofences();
-
-    } catch (error) {
-      console.error("Geofence save error:", error);
-      alert(error.message || "Failed to save geofence.");
+      setMessage("Meal timings updated successfully. ✅");
+    } catch (err) {
+      console.error("Meal timing save error:", err);
+      setError(err.message || "Could not update meal timings.");
     } finally {
       setSaving(false);
     }
   };
 
-  const editGeofence = (fence) => {
-
-    setEditingName(fence.name);
-
-    setName(fence.name || "");
-    setLatitude(String(fence.latitude || ""));
-    setLongitude(String(fence.longitude || ""));
-    setRadius(String(fence.radius_meters || 100));
-
-    window.scrollTo({
-      top: 0,
-      behavior: "smooth",
-    });
-  };
-
-  const deleteGeofence = async (fenceName) => {
-
-    if (!window.confirm(
-      `Delete "${fenceName}" geofence?`
-    )) {
-      return;
-    }
-
-    try {
-      setDeleting(fenceName);
-
-      const response = await fetch(
-        `https://mess-attendance-backend.vercel.app/geofences/${encodeURIComponent(
-          fenceName
-        )}`,
-        {
-          method: "DELETE",
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok || result.status !== "success") {
-        throw new Error(
-          result.message || "Failed to delete geofence."
-        );
-      }
-
-      alert("Geofence deleted successfully.");
-
-      if (editingName === fenceName) {
-        clearForm();
-      }
-
-      await loadGeofences();
-
-    } catch (error) {
-      console.error("Geofence delete error:", error);
-      alert(error.message || "Failed to delete geofence.");
-    } finally {
-      setDeleting(null);
-    }
-  };
+  const cards = [
+    { label: "Breakfast", icon: "☀️", start: "breakfast_start", end: "breakfast_end" },
+    { label: "Lunch", icon: "🍱", start: "lunch_start", end: "lunch_end" },
+    { label: "Snacks", icon: "☕", start: "snacks_start", end: "snacks_end" },
+    { label: "Dinner", icon: "🌙", start: "dinner_start", end: "dinner_end" },
+  ];
 
   return (
     <div className="content-card">
-
       <div className="card-header">
-
         <div>
-          <span className="section-label">
-            LOCATION CONTROL
-          </span>
-
-          <h2>
-            Geofence Management
-          </h2>
-
-          <p>
-            Manage allowed attendance locations.
-          </p>
+          <span className="section-label">MEAL MANAGEMENT</span>
+          <h2>Mess Timing</h2>
+          <p>Teacher can change when each meal accepts attendance.</p>
         </div>
 
         <button
-          className="secondary-button"
-          onClick={loadGeofences}
+          type="button"
+          className="refresh-button"
+          onClick={loadTimings}
+          disabled={loading || saving}
         >
           ↻ Refresh
         </button>
-
       </div>
 
-
-      {/* ADD / EDIT */}
-
-      <div className="dashboard-panel">
-
-        <div className="panel-header">
-
-          <div>
-            <span className="section-label">
-              {editingName ? "EDIT" : "ADD"}
-            </span>
-
-            <h3>
-              {editingName
-                ? "Edit Geofence"
-                : "Add Geofence"}
-            </h3>
-          </div>
-
+      {message && (
+        <div style={{ marginBottom: "18px", padding: "12px 14px", borderRadius: "10px", background: "#ecfdf5", color: "#166534", border: "1px solid #bbf7d0", fontWeight: 600 }}>
+          {message}
         </div>
+      )}
 
-
-        <div className="filter-bar">
-
-          <div className="filter-item">
-            <label>Name</label>
-
-            <input
-              type="text"
-              placeholder="Mess 2"
-              value={name}
-              onChange={(e) =>
-                setName(e.target.value)
-              }
-            />
-          </div>
-
-
-          <div className="filter-item">
-            <label>Latitude</label>
-
-            <input
-              type="number"
-              step="any"
-              placeholder="25.451630"
-              value={latitude}
-              onChange={(e) =>
-                setLatitude(e.target.value)
-              }
-            />
-          </div>
-
-
-          <div className="filter-item">
-            <label>Longitude</label>
-
-            <input
-              type="number"
-              step="any"
-              placeholder="85.746380"
-              value={longitude}
-              onChange={(e) =>
-                setLongitude(e.target.value)
-              }
-            />
-          </div>
-
-
-          <div className="filter-item">
-            <label>Radius (meters)</label>
-
-            <input
-              type="number"
-              min="1"
-              value={radius}
-              onChange={(e) =>
-                setRadius(e.target.value)
-              }
-            />
-          </div>
-
+      {error && (
+        <div style={{ marginBottom: "18px", padding: "12px 14px", borderRadius: "10px", background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", fontWeight: 600 }}>
+          {error}
         </div>
+      )}
 
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px", marginBottom: "20px" }}>
+        {cards.map((card) => (
+          <div key={card.label} style={{ border: "1px solid #e5e7eb", borderRadius: "14px", padding: "18px", background: "#ffffff", boxShadow: "0 6px 18px rgba(15, 23, 42, 0.06)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px", fontWeight: 700, fontSize: "17px" }}>
+              <span>{card.icon}</span>
+              <span>{card.label}</span>
+            </div>
 
-        <div
-          style={{
-            display: "flex",
-            gap: "10px",
-            marginTop: "15px",
-          }}
-        >
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <label style={{ fontSize: "12px", fontWeight: 700 }}>
+                START
+                <input type="time" value={timings[card.start]} onChange={(e) => update(card.start, e.target.value)} disabled={loading || saving} style={{ display: "block", width: "100%", marginTop: "6px", padding: "10px 8px", border: "1px solid #cbd5e1", borderRadius: "9px", fontSize: "15px" }} />
+              </label>
 
-          <button
-            className="primary-button"
-            onClick={saveGeofence}
-            disabled={saving}
-          >
-            {saving
-              ? "Saving..."
-              : editingName
-              ? "Update Geofence"
-              : "Add Geofence"}
-          </button>
+              <label style={{ fontSize: "12px", fontWeight: 700 }}>
+                END
+                <input type="time" value={timings[card.end]} onChange={(e) => update(card.end, e.target.value)} disabled={loading || saving} style={{ display: "block", width: "100%", marginTop: "6px", padding: "10px 8px", border: "1px solid #cbd5e1", borderRadius: "9px", fontSize: "15px" }} />
+              </label>
+            </div>
 
-
-          {editingName && (
-            <button
-              className="secondary-button"
-              onClick={clearForm}
-            >
-              Cancel
-            </button>
-          )}
-
-        </div>
-
+            {card.label === "Dinner" && (
+              <small style={{ display: "block", marginTop: "10px", color: "#64748b" }}>
+                12:00 AM is supported as the overnight end time.
+              </small>
+            )}
+          </div>
+        ))}
       </div>
 
-
-      {/* LIST */}
-
-      <div
-        className="dashboard-panel"
-        style={{ marginTop: "20px" }}
-      >
-
-        <div className="panel-header">
-
-          <div>
-            <span className="section-label">
-              ACTIVE LOCATIONS
-            </span>
-
-            <h3>
-              Configured Geofences
-            </h3>
-          </div>
-
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap", padding: "16px", borderRadius: "12px", background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+        <div>
+          <strong>Attendance uses server time.</strong>
+          <p style={{ margin: "4px 0 0", color: "#64748b" }}>Changes apply to new scans immediately after saving.</p>
         </div>
 
-
-        {loading ? (
-          <LoadingState text="Loading geofences..." />
-        ) : geofences.length === 0 ? (
-
-          <EmptyState
-            icon="📍"
-            title="No Geofences"
-            text="No geofence locations configured."
-          />
-
-        ) : (
-
-          <div className="table-wrapper">
-
-            <table className="admin-table">
-
-              <thead>
-
-                <tr>
-                  <th>Name</th>
-                  <th>Latitude</th>
-                  <th>Longitude</th>
-                  <th>Radius</th>
-                  <th>Actions</th>
-                </tr>
-
-              </thead>
-
-
-              <tbody>
-
-                {geofences.map((fence) => (
-
-                  <tr key={fence.name}>
-
-                    <td>
-                      <strong>
-                        {fence.name}
-                      </strong>
-                    </td>
-
-                    <td>
-                      {fence.latitude}
-                    </td>
-
-                    <td>
-                      {fence.longitude}
-                    </td>
-
-                    <td>
-                      {fence.radius_meters} m
-                    </td>
-
-                    <td>
-
-                      <button
-                        type="button"
-                        className="secondary-button"
-                        onClick={() =>
-                          editGeofence(fence)
-                        }
-                        style={{
-                          marginRight: "8px",
-                        }}
-                      >
-                        ✏️ Edit
-                      </button>
-
-
-                      <button
-                        type="button"
-                        className="delete-button"
-                        onClick={() =>
-                          deleteGeofence(fence.name)
-                        }
-                        disabled={
-                          deleting === fence.name
-                        }
-                      >
-                        {deleting === fence.name
-                          ? "Deleting..."
-                          : "🗑 Delete"}
-                      </button>
-
-                    </td>
-
-                  </tr>
-
-                ))}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
-        )}
-
+        <button type="button" className="primary-button" onClick={saveTimings} disabled={loading || saving}>
+          {saving ? "Saving..." : "💾 Save Timing"}
+        </button>
       </div>
-
     </div>
   );
 }
 
+/* =====================================================
+   NOTICES
+===================================================== */
 
 
 function NoticesPage() {

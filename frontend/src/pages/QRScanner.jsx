@@ -3,6 +3,7 @@ import { Html5Qrcode } from "html5-qrcode";
 import { supabase } from "../lib/supabase";
 import "../styles/QRScanner.css";
 
+
 const QR_READER_ID = "mess-qr-reader";
 
 // Permanent Mess QR ka fixed value
@@ -242,82 +243,6 @@ function QRScanner() {
 
     try {
       // =====================================================
-      // GET DEVICE LOCATION
-      // =====================================================
-
-      if (!navigator.geolocation) {
-        throw new Error(
-          "Geolocation is not supported by this browser."
-        );
-      }
-
-      setMessage("Getting your current location...");
-
-      const position = await new Promise((resolve, reject) => {
-  navigator.geolocation.getCurrentPosition(
-    resolve,
-    (geoError) => {
-      console.log("First GPS attempt failed:", geoError);
-
-      // Second attempt with more time and cached location allowed
-      navigator.geolocation.getCurrentPosition(
-        resolve,
-        (secondError) => {
-          console.log("Second GPS attempt failed:", secondError);
-          reject(secondError);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 60000,
-          maximumAge: 30000,
-        }
-      );
-    },
-    {
-      enableHighAccuracy: false,
-      timeout: 15000,
-      maximumAge: 30000,
-        }
-  );
-});
-
-      const latitude = Number(position.coords.latitude);
-const longitude = Number(position.coords.longitude);
-
-const accuracy = Number(position.coords.accuracy);
-
-console.log("========== GPS DEBUG ==========");
-console.log("Latitude :", latitude);
-console.log("Longitude:", longitude);
-console.log("Accuracy :", accuracy, "meters");
-console.log("================================");
-
-setMessage(
-  `GPS Location:
-Lat: ${latitude.toFixed(6)}
-Lng: ${longitude.toFixed(6)}
-Accuracy: ${Math.round(accuracy)}m`
-);
-
-      if (
-        !Number.isFinite(latitude) ||
-        !Number.isFinite(longitude)
-      ) {
-        throw new Error(
-          "Invalid device location received."
-        );
-      }
-
-      console.log("Attendance location:", {
-        latitude,
-        longitude,
-      });
-
-      setMessage(
-        "Location verified. Marking attendance..."
-      );
-
-      // =====================================================
       // CALL BACKEND
       // =====================================================
 
@@ -333,8 +258,6 @@ Accuracy: ${Math.round(accuracy)}m`
           body: JSON.stringify({
             student_id: student.id,
             roll_no: student.roll_no,
-            latitude,
-            longitude,
           }),
         }
       );
@@ -578,7 +501,7 @@ Accuracy: ${Math.round(accuracy)}m`
 
               <h3>
                 Scan the permanent QR displayed at the mess <br />
-                 • Please give location and camera permission to mark attendance
+                 • Please give camera permission to mark attendance
               </h3>
 
             </div>
@@ -977,7 +900,7 @@ Accuracy: ${Math.round(accuracy)}m`
               </span>
 
               <p>
-                Allow camera permission <br /> And also location permission
+                Allow camera permission
               </p>
 
             </div>
