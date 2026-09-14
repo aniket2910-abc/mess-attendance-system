@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import * as XLSX from "xlsx";
 import { supabase } from "../lib/supabase";
 import "../styles/Dashboard.css";
 import collegeLogo from "../assets/white logo gp.jpeg";
@@ -104,6 +105,8 @@ function Dashboard() {
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyFilter, setHistoryFilter] = useState("All");
+  const [historyStatusFilter, setHistoryStatusFilter] = useState("All");
+  const [historyMealFilter, setHistoryMealFilter] = useState("All");
   const [historyOpen, setHistoryOpen] = useState(false);
 
   const [activeModal, setActiveModal] = useState(null);
@@ -456,6 +459,279 @@ const handleComplaintSubmit = async (e) => {
     setComplaintSubmitting(false);
   }
 };
+
+
+  /* ================= STUDENT HISTORY EXPORT ================= */
+
+  const getExportHistoryRows = () => {
+    return history.filter((item) => {
+      const statusMatches =
+        historyStatusFilter === "All" ||
+        String(item.historyStatus || "").toLowerCase() ===
+          historyStatusFilter.toLowerCase();
+
+      const mealMatches =
+        historyMealFilter === "All" ||
+        item.meal_type === historyMealFilter;
+
+      return statusMatches && mealMatches;
+    });
+  };
+
+  const exportHistoryExcel = () => {
+    const rows = getExportHistoryRows();
+
+    if (!rows.length) {
+      alert("No attendance records match the selected filters.");
+      return;
+    }
+
+    const exportData = rows.map((item) => ({
+      Date: formatHistoryDate(item.attendance_date),
+      Time: item.scan_time ? formatHistoryTime(item.scan_time) : "—",
+      "Student Name": student.name || "—",
+      Email: student.email || "—",
+      "Roll No.": student.roll_no || "—",
+      Hostel: student.hostel || "—",
+      Room: student.room_number || "—",
+      Meal: item.meal_type || "—",
+      Status: item.historyStatus || "—",
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    worksheet["!cols"] = [
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 24 },
+      { wch: 30 },
+      { wch: 16 },
+      { wch: 20 },
+      { wch: 12 },
+      { wch: 14 },
+      { wch: 12 },
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
+
+    XLSX.writeFile(
+      workbook,
+      `My_Mess_Attendance_${getTodayIndia()}.xlsx`
+    );
+  };
+
+  const exportHistoryPDF = () => {
+    const rows = getExportHistoryRows();
+
+    if (!rows.length) {
+      alert("No attendance records match the selected filters.");
+      return;
+    }
+
+    const escapeHtml = (value) =>
+      String(value ?? "—")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+    const filterStatusLabel =
+      historyStatusFilter === "All"
+        ? "All Status"
+        : historyStatusFilter;
+
+    const filterMealLabel =
+      historyMealFilter === "All"
+        ? "All Meals"
+        : historyMealFilter;
+
+    const tableRows = rows
+      .map(
+        (item, index) => `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(formatHistoryDate(item.attendance_date))}</td>
+            <td>${escapeHtml(
+              item.scan_time ? formatHistoryTime(item.scan_time) : "—"
+            )}</td>
+            <td>${escapeHtml(item.meal_type)}</td>
+            <td>${escapeHtml(item.historyStatus)}</td>
+          </tr>
+        `
+      )
+      .join("");
+
+    const popup = window.open(
+      "",
+      "_blank",
+      "width=1000,height=800"
+    );
+
+    if (!popup) {
+      alert("Please allow pop-ups to generate the PDF.");
+      return;
+    }
+
+    popup.document.write(`
+      <!doctype html>
+      <html>
+        <head>
+          <title>My Mess Attendance Report</title>
+          <style>
+            * { box-sizing: border-box; }
+            body {
+              font-family: Arial, sans-serif;
+              margin: 0;
+              padding: 32px;
+              color: #111827;
+              background: #ffffff;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #172554;
+              padding-bottom: 16px;
+              margin-bottom: 22px;
+            }
+            .header h1 {
+              margin: 0 0 6px;
+              font-size: 25px;
+              color: #172554;
+            }
+            .header p {
+              margin: 3px 0;
+              color: #4b5563;
+              font-size: 13px;
+            }
+            .student-card {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 10px 24px;
+              margin-bottom: 20px;
+              padding: 16px;
+              border: 1px solid #dbe3ef;
+              border-radius: 10px;
+              background: #f8fafc;
+            }
+            .student-item strong {
+              display: inline-block;
+              min-width: 90px;
+              color: #172554;
+            }
+            .filters {
+              margin-bottom: 18px;
+              padding: 12px 14px;
+              border-radius: 8px;
+              background: #eef2ff;
+              font-size: 13px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 10px;
+              font-size: 12px;
+            }
+            th {
+              background: #172554;
+              color: #ffffff;
+              padding: 9px 8px;
+              text-align: left;
+              border: 1px solid #172554;
+            }
+            td {
+              padding: 8px;
+              border: 1px solid #dbe3ef;
+            }
+            tr:nth-child(even) td {
+              background: #f8fafc;
+            }
+            .total {
+              margin-top: 16px;
+              font-weight: 700;
+              text-align: right;
+            }
+            .footer {
+              margin-top: 24px;
+              padding-top: 12px;
+              border-top: 1px solid #e5e7eb;
+              color: #6b7280;
+              text-align: center;
+              font-size: 11px;
+            }
+            @media print {
+              body { padding: 15px; }
+              @page { size: A4; margin: 12mm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>MY MESS ATTENDANCE REPORT</h1>
+            <p>Government Polytechnic Barh</p>
+            <p>Generated on ${escapeHtml(
+              new Date().toLocaleString("en-IN", {
+                timeZone: "Asia/Kolkata",
+              })
+            )}</p>
+          </div>
+
+          <div class="student-card">
+            <div class="student-item"><strong>Name:</strong> ${escapeHtml(student.name)}</div>
+            <div class="student-item"><strong>Email:</strong> ${escapeHtml(student.email)}</div>
+            <div class="student-item"><strong>Roll No.:</strong> ${escapeHtml(student.roll_no)}</div>
+            <div class="student-item"><strong>Hostel:</strong> ${escapeHtml(student.hostel)}</div>
+            <div class="student-item"><strong>Room:</strong> ${escapeHtml(student.room_number)}</div>
+            <div class="student-item"><strong>Records:</strong> ${rows.length}</div>
+          </div>
+
+          <div class="filters">
+            <strong>Filters:</strong>
+            Status = ${escapeHtml(filterStatusLabel)}
+            &nbsp;&nbsp; | &nbsp;&nbsp;
+            Meal = ${escapeHtml(filterMealLabel)}
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Meal</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+
+          <div class="total">Total Matching Records: ${rows.length}</div>
+
+          <div class="footer">
+            Generated from the student attendance history. Only records matching the selected filters are included.
+          </div>
+        </body>
+      </html>
+    `);
+
+    popup.document.close();
+
+    setTimeout(() => {
+      popup.focus();
+      popup.print();
+    }, 400);
+  };
+
+  /*
+   * Keep the existing combined history filter in place for the table,
+   * but reset it whenever the new separate filters are changed.
+   */
+  const clearHistoryExportFilters = () => {
+    setHistoryStatusFilter("All");
+    setHistoryMealFilter("All");
+    setHistoryFilter("All");
+  };
 
   /* ================= LOGOUT ================= */
 
@@ -1086,39 +1362,92 @@ const handleComplaintSubmit = async (e) => {
 
               </div>
 
-              {/* ================= FILTER ================= */}
-              <div className="history-filter">
-                <label>
-                  Filter History
-                </label>
-
-                <select
-                  value={historyFilter}
-                  onChange={(e) =>
-                    setHistoryFilter(e.target.value)
-                  }
+              {/* ================= FILTERS + EXPORT ================= */}
+              <div
+                className="history-filter"
+                style={{
+                  display: "flex",
+                  alignItems: "flex-end",
+                  gap: "14px",
+                  flexWrap: "wrap",
+                  justifyContent: "space-between",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "14px",
+                    flexWrap: "wrap",
+                    alignItems: "flex-end",
+                  }}
                 >
-                  <option value="All">
-                    All Meals
-                  </option>
-
-                  <option value="Present">
-                    Present
-                  </option>
-
-                  <option value="Absent">
-                    Absent
-                  </option>
-
-                  {MEALS.map((meal) => (
-                    <option
-                      value={meal}
-                      key={meal}
+                  <div>
+                    <label>Status</label>
+                    <select
+                      value={historyStatusFilter}
+                      onChange={(e) => {
+                        setHistoryStatusFilter(e.target.value);
+                        setHistoryFilter("All");
+                      }}
                     >
-                      {meal}
-                    </option>
-                  ))}
-                </select>
+                      <option value="All">All Status</option>
+                      <option value="Present">Present</option>
+                      <option value="Absent">Absent</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label>Meal</label>
+                    <select
+                      value={historyMealFilter}
+                      onChange={(e) => {
+                        setHistoryMealFilter(e.target.value);
+                        setHistoryFilter("All");
+                      }}
+                    >
+                      <option value="All">All Meals</option>
+                      {MEALS.map((meal) => (
+                        <option value={meal} key={meal}>
+                          {meal}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="service-btn"
+                    onClick={clearHistoryExportFilters}
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "10px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <button
+                    type="button"
+                    className="service-btn"
+                    onClick={exportHistoryExcel}
+                    disabled={historyLoading || history.length === 0}
+                  >
+                    📊 Export Excel
+                  </button>
+
+                  <button
+                    type="button"
+                    className="service-btn"
+                    onClick={exportHistoryPDF}
+                    disabled={historyLoading || history.length === 0}
+                  >
+                    📄 Export PDF
+                  </button>
+                </div>
               </div>
 
               {/* ================= HISTORY TABLE ================= */}
@@ -1141,18 +1470,15 @@ const handleComplaintSubmit = async (e) => {
                     <tbody>
                       {(() => {
                         const filteredHistory = history.filter((item) => {
-                          if (historyFilter === "All") {
-                            return true;
-                          }
+                          const statusMatches =
+                            historyStatusFilter === "All" ||
+                            item.historyStatus === historyStatusFilter;
 
-                          if (
-                            historyFilter === "Present" ||
-                            historyFilter === "Absent"
-                          ) {
-                            return item.historyStatus === historyFilter;
-                          }
+                          const mealMatches =
+                            historyMealFilter === "All" ||
+                            item.meal_type === historyMealFilter;
 
-                          return item.meal_type === historyFilter;
+                          return statusMatches && mealMatches;
                         });
 
                         const groupedByDate = {};
